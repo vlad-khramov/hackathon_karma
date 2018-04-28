@@ -1,23 +1,26 @@
-module.exports = {
-    networks: {
-        development: {
-            host: "localhost",
-            port: 9545,
-            gasPrice: 1,
-            network_id: "*" // Match any network id
-        },
+require('babel-register');
+require('babel-polyfill');
 
-        rinkeby: {  // testnet
-            host: "localhost",
-            port: 8547,
-            network_id: 4
-        }
+module.exports = {
+  networks: {
+    development: {
+      host: "localhost",
+      port: 9545,
+      gasPrice: 1,
+      network_id: "*" // Match any network id
     },
-    solc: {
-        optimizer: {
-            enabled: true,
-            runs: 200
-        }
+
+    rinkeby: {  // testnet
+      host: "localhost",
+      port: 8547,
+      network_id: 4
     }
+  },
+  solc: {
+    optimizer: {
+      enabled: true,
+      runs: 200
+    }
+  }
 
 };
