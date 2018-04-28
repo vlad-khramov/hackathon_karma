@@ -105,7 +105,7 @@ contract Loans is Ownable {
         requireLoanNotStarted(_id);
         require(loans[_id].expert == address(0));
 
-        require(balanceOf[msg.sender] > _tokensCount);
+        require(balanceOf[msg.sender] >= _tokensCount);
 
         loans[_id].expert = msg.sender;
         loans[_id].supportedTokens = _tokensCount;
@@ -120,7 +120,7 @@ contract Loans is Ownable {
         requireLoanExists(_id);
         requireLoanNotStarted(_id);
 
-        require(balanceOf[msg.sender] > loans[_id].tokensCount);
+        require(balanceOf[msg.sender] >= loans[_id].tokensCount);
 
         loans[_id].startTs = getCurrentTime();
         loans[_id].creditor = msg.sender;
@@ -133,20 +133,22 @@ contract Loans is Ownable {
         requireLoanStarted(_id);
         requireLoanNotFinished(_id);
 
-        require(balanceOf[msg.sender] > loans[_id].tokensCountToReturn);
-        require(loans[_id].startTs + loans[_id].daysCount*secondsInDay < getCurrentTime());
+        require(msg.sender == loans[_id].debtor);
+        require(balanceOf[msg.sender] >= loans[_id].tokensCountToReturn);
+        require(loans[_id].startTs + loans[_id].daysCount*secondsInDay > getCurrentTime());
 
         loans[_id].isFinished = true;
         loans[_id].isReturned = true;
 
         transferTokens(loans[_id].creditor, loans[_id].tokensCount);
 
+
         uint percents = loans[_id].tokensCountToReturn.sub(loans[_id].tokensCount);
 
         uint creditorPercents = percents
             .mul(loans[_id].tokensCountToReturn)
             .div(
-                loans[_id].supportedTokens + loans[_id].tokensCountToReturn
+                loans[_id].supportedTokens.add(loans[_id].tokensCountToReturn)
             );
 
         transferTokens(loans[_id].creditor, creditorPercents);
@@ -169,14 +171,14 @@ contract Loans is Ownable {
         requireLoanStarted(_id);
         requireLoanNotFinished(_id);
 
-        require(loans[_id].startTs + loans[_id].daysCount*secondsInDay > getCurrentTime());
+        require(loans[_id].startTs + loans[_id].daysCount*secondsInDay < getCurrentTime());
 
         loans[_id].isFinished = true;
 
         uint creditorTokens = loans[_id].supportedTokens
             .mul(loans[_id].tokensCountToReturn)
             .div(
-                loans[_id].supportedTokens + loans[_id].tokensCountToReturn
+                loans[_id].supportedTokens.add(loans[_id].tokensCountToReturn)
             );
 
         balanceOf[ loans[_id].creditor ] = balanceOf[ loans[_id].creditor ].add(creditorTokens);
@@ -194,7 +196,7 @@ contract Loans is Ownable {
 
     function transferTokens(address _to, uint _count) public {
         require(_to != address(0));
-        require(balanceOf[msg.sender] > _count);
+        require(balanceOf[msg.sender] >= _count);
 
         balanceOf[msg.sender] -= _count;
         balanceOf[_to] = balanceOf[_to].add(_count);
@@ -216,7 +218,7 @@ contract Loans is Ownable {
     /*********************************************/
 
     function requireLoanExists(uint _id) private view {
-        require(_id < loans.length-1);
+        require(_id < loans.length);
     }
 
     function requireLoanStarted(uint _id) private  view {

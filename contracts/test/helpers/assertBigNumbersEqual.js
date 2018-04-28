@@ -1,5 +1,5 @@
 const assertBnEq = (a, b, message) =>  {
-  assert(a.eq(b), `${message} (${a.valueOf()} != ${b.valueOf()})`)
+  assert(web3.toBigNumber(a).eq(b), `${message} (${a.valueOf()} != ${b.valueOf()})`)
 };
 
 
