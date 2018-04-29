@@ -25,3 +25,9 @@
 
 В качестве гарантии за один кредит взносы могут вносить несколько экспертов. Для простоты в рамках хакатона реализован взнос только от одного.
 
+---
+
+./node_modules/.bin/ganache-cli -a 300 -g 0
+./node_modules/.bin/truffle compile && ./node_modules/.bin/truffle exec emulators/debtors.js
+
+
