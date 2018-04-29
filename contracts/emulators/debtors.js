@@ -1,13 +1,18 @@
 const Loans = artifacts.require('Loans');
+const util = require('util');
+const exec = util.promisify(require('child_process').exec);
+const fs = require('fs');
+const readline = require('readline');
+
 
 const DEBTORS_START = 10;
-const DEBTORS_COUNT = 100;
+const DEBTORS_COUNT = 200;
 
-const EXPERTS_START = 110;
+const EXPERTS_START = 210;
 const EXPERTS_COUNT = 40;
 
-const CREDITORS_START = 150;
-const CREDITORS_COUNT = 150;
+const CREDITORS_START = 250;
+const CREDITORS_COUNT = 50;
 
 const TOTAL_COUNT = 300;
 
@@ -24,11 +29,38 @@ let instance;
 let loans = [];
 let loansByDebtor={};
 
+let expertStats = {
+
+};
 
 
 /***************************************************************/
 
-function expertScoringStrategy() {
+async function expertScoringStrategy(debtor, loanSum) {
+  if (!loansByDebtor[debtor]) {
+    return 0;
+  }
+
+  let fn = `/tmp/train${Math.random()}.json`;
+
+  await fs.writeFile(fn, JSON.stringify(loansByDebtor[debtor]), 'utf8', x=>x);
+
+  const { stdout, stderr } = await exec('python3 ../scoring/score.py ' + fn, '../scoring/');
+
+  if (stderr) {
+    return 0;
+  }
+
+  try {
+    let score = parseFloat(stdout);
+    if (score< 0.5) {
+      return 0;
+    }
+
+    return loanSum.mul((parseFloat(stdout)-0.5)*2);
+  } catch (e) {
+    return 0;
+  }
 
 }
 
@@ -44,10 +76,10 @@ function expertRandomStrategy() {
 
 /***************************************************************/
 
-function loanRequestHandler(error, result) {
+async function loanRequestHandler(error, result) {
   if (error) return;
 
-  console.log(`LoanRequest.\t\tid: ${result.args.id},\tdebtor: ${result.args.debtor},\tdays: ${result.args.daysCount},\ttokens: ${result.args.tokensCount}`);
+  log(`LoanRequest.\t\tid: ${result.args.id},\tdebtor: ${result.args.debtor},\tdays: ${result.args.daysCount},\ttokens: ${result.args.tokensCount}`);
 
   currentExpert = ++currentExpert % EXPERTS_COUNT;
   currentCreditor = ++currentCreditor % CREDITORS_COUNT;
@@ -55,13 +87,16 @@ function loanRequestHandler(error, result) {
   let expertId = EXPERTS_START + currentExpert;
   let creditorId = CREDITORS_START + currentCreditor;
 
+  let supportSum = 0;
   if (expertId === EXPERTS_START) {
-    //ML
+    supportSum = await expertScoringStrategy(result.args.debtor, result.args.tokensCount);
   } else {
     let confidence = expertRandomStrategy();
-    if (confidence > 0) {
-      instance.supportLoan(result.args.id, result.args.tokensCount.mul(confidence), {from: accounts[expertId]});
-    }
+    supportSum = result.args.tokensCount.mul(confidence);
+  }
+
+  if (supportSum > 0) {
+    instance.supportLoan(result.args.id, supportSum, {from: accounts[expertId]});
   }
 
   instance.acceptRequest(result.args.id, {from: accounts[creditorId]})
@@ -70,18 +105,19 @@ function loanRequestHandler(error, result) {
 function loanSupportedHandler(error, result) {
   if (error) return;
 
-  console.log(`LoanSupported.\t\tid: ${result.args.id},\tdebtor: ${result.args.debtor},\texpert: ${result.args.expert}, \ttokens: ${result.args.supportedTokens}`);
+  log(`LoanSupported.\t\tid: ${result.args.id},\tdebtor: ${result.args.debtor},\texpert: ${result.args.expert}, \ttokens: ${result.args.supportedTokens}`);
 }
 
 async function requestAcceptedHandler(error, result) {
   if (error) return;
 
-  console.log(`RequestAccepted.\tid: ${result.args.id},\tdebtor: ${result.args.debtor}, \tcreditor: ${result.args.creditor}`);
+  log(`RequestAccepted.\tid: ${result.args.id},\tdebtor: ${result.args.debtor}, \tcreditor: ${result.args.creditor}`);
 
   let debtorsParam = debtorsParams[ debtorsMap[result.args.debtor] ];
 
-  let isPayOff = (debtorsParam.request*2 + debtorsParam.days-0.1 + debtorsParam.sum*3)/6;
-  if (isPayOff > 0.5) {
+  let isPayOff = (debtorsParam.request + debtorsParam.days*2 + debtorsParam.sum*3)/6;
+
+  if (isPayOff > 0.4 + Math.random()/5) {
     instance.payOffLoan(result.args.id, {from: result.args.debtor})
   } else {
     instance.reportOverdueLoanByDebtor(result.args.id, {from: result.args.debtor});
@@ -91,7 +127,7 @@ async function requestAcceptedHandler(error, result) {
 function loanFinishedHandler(error, result) {
   if (error) return;
 
-  console.log(`LoanFinished.\t\tid: ${result.args.id},\tdebtor: ${result.args.debtor},\ttokens: ${result.args.tokensCount},\tdays: ${result.args.daysCount},\tsuccess: ${result.args.isSuccessful}`);
+  log(`LoanFinished.\t\tid: ${result.args.id},\tdebtor: ${result.args.debtor},\ttokens: ${result.args.tokensCount},\tdays: ${result.args.daysCount},\tsuccess: ${result.args.isSuccessful}`);
 
   let data = [
     result.args.debtor,
@@ -133,7 +169,7 @@ module.exports = async function (callback) {
 
     debtorsParams[i] = {
       request: Math.random(),
-      days: Math.random() + 0.1,
+      days: Math.random(),
       sum: Math.random()
     };
   }
@@ -141,7 +177,7 @@ module.exports = async function (callback) {
 
   let debtorStat = {};
   //debtors
-  for (let round = 1; round < 1000; round++) {
+  for (let round = 1; round < 10; round++) {
     for (let i = DEBTORS_START; i < EXPERTS_START; i++) {
       if (Math.random() * 30 > debtorsParams[i].request) {
         continue;
@@ -153,7 +189,7 @@ module.exports = async function (callback) {
 
       let days, sum;
       for (days = 1; days < 30; days++) {
-        if (Math.random() < debtorsParams[i].days) {
+        if (Math.random() < debtorsParams[i].days + 0.1) {
           break;
         }
       }
@@ -168,8 +204,10 @@ module.exports = async function (callback) {
       await instance.requestLoan(sum, days, {from: accounts[i]});
 
     }
+    readline.clearScreenDown(process.stdout);
     console.log(/*debtorStat, */`round ${round}, `, 'debtors count: ', Object.keys(debtorStat).length);
     //await sleep(200)
+
   }
 
   await sleep(3000);
@@ -180,7 +218,7 @@ module.exports = async function (callback) {
   }
 
 
-  let fs = require('fs');
+
   await fs.writeFile('./artifacts/train.json', JSON.stringify(loans), 'utf8', x=>x);
 
 };
@@ -189,3 +227,8 @@ module.exports = async function (callback) {
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+function log(message) {
+  // console.log(message)
+}
+
