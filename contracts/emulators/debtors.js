@@ -21,6 +21,9 @@ let debtorsParams = {};
 let debtorsMap = {};
 let instance;
 
+let loans = [];
+let loansByDebtor={};
+
 
 
 /***************************************************************/
@@ -29,6 +32,11 @@ function expertScoringStrategy() {
 
 }
 
+/**
+ * Random expert strategy.
+ *
+ * @returns {any}
+ */
 function expertRandomStrategy() {
   let rand = Math.random().toPrecision(10);
   return rand > 0.5 ? rand : 0;
@@ -84,6 +92,20 @@ function loanFinishedHandler(error, result) {
   if (error) return;
 
   console.log(`LoanFinished.\t\tid: ${result.args.id},\tdebtor: ${result.args.debtor},\ttokens: ${result.args.tokensCount},\tdays: ${result.args.daysCount},\tsuccess: ${result.args.isSuccessful}`);
+
+  let data = [
+    result.args.debtor,
+    result.args.tokensCount,
+    result.args.daysCount,
+    result.args.isSuccessful
+  ];
+
+  loans.push(data);
+
+  if (!loansByDebtor[result.args.debtor]) {
+    loansByDebtor[result.args.debtor] = [];
+  }
+  loansByDebtor[result.args.debtor].push(data);
 }
 
 
@@ -156,6 +178,10 @@ module.exports = async function (callback) {
     console.log(`${i}\t` + await instance.balanceOf(accounts[i]));
 
   }
+
+
+  let fs = require('fs');
+  await fs.writeFile('./artifacts/train.json', JSON.stringify(loans), 'utf8', x=>x);
 
 };
 
