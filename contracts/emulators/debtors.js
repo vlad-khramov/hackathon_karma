@@ -69,12 +69,10 @@ async function expertScoringStrategy(debtor, loanSum) {
 
 /**
  * Random expert strategy.
- *
- * @returns {any}
  */
 function expertRandomStrategy() {
-  let rand = Math.random().toPrecision(10);
-  return rand > 0.5 ? rand : 0;
+  let rand = Math.random();
+  return rand > 0.5 ? ((rand-0.5)*2).toPrecision(10) : 0;
 }
 
 /***************************************************************/
@@ -99,7 +97,7 @@ async function loanRequestHandler(error, result) {
   }
 
   if (supportSum > 0) {
-    instance.supportLoan(result.args.id, supportSum, {from: accounts[expertId]});
+    instance.supportLoan(result.args.id, supportSum, {from: accounts[expertId]}).catch(x=>x);// sometimes accept below can run earlier. It is norm
   }
 
   instance.acceptRequest(result.args.id, {from: accounts[creditorId]})
@@ -204,7 +202,7 @@ module.exports = async function (callback) {
 
   let debtorStat = {};
   //debtors
-  for (let round = 1; round < 1000; round++) {
+  for (let round = 1; round <= 1000; round++) {
     for (let i = DEBTORS_START; i < EXPERTS_START; i++) {
       if (Math.random() * 30 > debtorsParams[i].request) {
         continue;
@@ -232,6 +230,7 @@ module.exports = async function (callback) {
 
     }
     console.log('\x1Bc');
+    console.log(`Round: ${round}/${1000}`);
     console.log(`Issued:\t\tloans:\t${loansCount}\tTokens:\t${loansTokensCount}\tUnique debtors:\t${Object.keys(debtorStat).length}`);
     console.log(`Returned:\tloans:\t${loansSuccessCount}\tTokens:\t${loansSuccessTokensCount}`);
 
