@@ -64,7 +64,7 @@ contract Loans is Ownable {
     event LoanFinished(uint id, address debtor, uint tokensCount, uint daysCount, bool isSuccessful, address expert, uint supportedTokens);
 
     /*********************************************/
-    function constructor(bool _isDebug) public {
+    function Loans(bool _isDebug) public {
         isDebug=_isDebug;
     }
 
@@ -190,10 +190,10 @@ contract Loans is Ownable {
 
         if (loans[_id].expert != address(0)) {
             uint creditorTokens = loans[_id].supportedTokens
-            .mul(loans[_id].tokensCountToReturn)
-            .div(
-                loans[_id].supportedTokens.add(loans[_id].tokensCountToReturn)
-            );
+                .mul(loans[_id].supportedTokens)
+                .div(
+                    loans[_id].supportedTokens.add(loans[_id].tokensCountToReturn)
+                );
 
             balanceOf[loans[_id].creditor] = balanceOf[loans[_id].creditor].add(creditorTokens);
             balanceOf[loans[_id].expert] = balanceOf[loans[_id].expert].add(
@@ -223,10 +223,10 @@ contract Loans is Ownable {
 
         if (loans[_id].expert != address(0)) {
             uint creditorTokens = loans[_id].supportedTokens
-            .mul(loans[_id].tokensCountToReturn)
-            .div(
-                loans[_id].supportedTokens.add(loans[_id].tokensCountToReturn)
-            );
+                .mul(loans[_id].supportedTokens)
+                .div(
+                    loans[_id].supportedTokens.add(loans[_id].tokensCountToReturn)
+                );
 
             balanceOf[loans[_id].creditor] = balanceOf[loans[_id].creditor].add(creditorTokens);
             balanceOf[loans[_id].expert] = balanceOf[loans[_id].expert].add(

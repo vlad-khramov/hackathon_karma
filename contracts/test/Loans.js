@@ -77,8 +77,8 @@ contract('Loans', function (accounts) {
     await expectThrow(instance.payOffLoan(0, {from: role.debtor1}));
 
     await instance.reportOverdueLoan(0);
-    assertBnEq(9000 + 906, await instance.balanceOf(role.creditor1)); // 300*1300/(1300+3000)
-    assertBnEq(7000 + 2094, await instance.balanceOf(role.expert1));
+    assertBnEq(9000 + 2093, await instance.balanceOf(role.creditor1)); // 3000*3000/(1300+3000)
+    assertBnEq(7000 + 907, await instance.balanceOf(role.expert1));
 
   });
 
