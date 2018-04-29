@@ -246,7 +246,7 @@ module.exports = async function (callback) {
     for (let i = EXPERTS_START, nl=0; i < CREDITORS_START; i++, nl++) {
       let expStat = expertStats[ accounts[i] ];
       let expName = i===EXPERTS_START ? 'scoring' : 'random';
-      expertsLog += `${expName}#${i}:${expStat.success.toString().padStart(3, ' ')}/${expStat.supported.toString().padStart(3, ' ')}) (${expStat.successTokens.toString().padStart(5, ' ')}/${expStat.supportedTokens.toString().padStart(5, ' ')})\t\t`;
+      expertsLog += `${expName}#${i}:(${expStat.success.toString().padStart(3, ' ')}/${expStat.supported.toString().padStart(3, ' ')}) (${expStat.successTokens.toString().padStart(5, ' ')}/${expStat.supportedTokens.toString().padStart(5, ' ')})\t\t`;
       if (nl%4===0) {
         expertsLog+='\n'
       }
@@ -262,7 +262,7 @@ module.exports = async function (callback) {
 
   for (let i = EXPERTS_START, nl=0; i < CREDITORS_START; i++, nl++) {
     let expName = i===EXPERTS_START ? 'scoring' : 'random';
-    expertsBalanceLog += `${expName}#${i}:(${await instance.balanceOf(accounts[i])}\t\t`;
+    expertsBalanceLog += `${expName}#${i}:${await instance.balanceOf(accounts[i])}\t\t`;
     if (nl%4===0) {
       expertsBalanceLog+='\n'
     }
