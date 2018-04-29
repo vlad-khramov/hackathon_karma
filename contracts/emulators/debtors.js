@@ -23,15 +23,18 @@ let currentExpert = 0;
 let currentCreditor = 0;
 
 let debtorsParams = {};
-let debtorsMap = {};
+let accountsMap = {};
 let instance;
 
 let loans = [];
 let loansByDebtor={};
 
-let expertStats = {
+let expertStats = {};
 
-};
+let loansCount = 0;
+let loansSuccessCount = 0;
+let loansTokensCount = 0;
+let loansSuccessTokensCount = 0;
 
 
 /***************************************************************/
@@ -106,6 +109,9 @@ function loanSupportedHandler(error, result) {
   if (error) return;
 
   log(`LoanSupported.\t\tid: ${result.args.id},\tdebtor: ${result.args.debtor},\texpert: ${result.args.expert}, \ttokens: ${result.args.supportedTokens}`);
+
+  expertStats[result.args.expert].supported++;
+  expertStats[result.args.expert].supportedTokens+=parseInt(result.args.supportedTokens);
 }
 
 async function requestAcceptedHandler(error, result) {
@@ -113,7 +119,7 @@ async function requestAcceptedHandler(error, result) {
 
   log(`RequestAccepted.\tid: ${result.args.id},\tdebtor: ${result.args.debtor}, \tcreditor: ${result.args.creditor}`);
 
-  let debtorsParam = debtorsParams[ debtorsMap[result.args.debtor] ];
+  let debtorsParam = debtorsParams[ accountsMap[result.args.debtor] ];
 
   let isPayOff = (debtorsParam.request + debtorsParam.days*2 + debtorsParam.sum*3)/6;
 
@@ -142,6 +148,19 @@ function loanFinishedHandler(error, result) {
     loansByDebtor[result.args.debtor] = [];
   }
   loansByDebtor[result.args.debtor].push(data);
+
+  loansCount++;
+  loansTokensCount += parseInt(result.args.tokensCount);
+  if (result.args.isSuccessful) {
+    if (result.args.expert && '0x0000000000000000000000000000000000000000'!==result.args.expert) {
+      expertStats[result.args.expert].success++;
+      expertStats[result.args.expert].successTokens += parseInt(result.args.supportedTokens);
+    }
+
+    loansSuccessCount++;
+    loansSuccessTokensCount += parseInt(result.args.tokensCount);
+  }
+
 }
 
 
@@ -160,13 +179,21 @@ module.exports = async function (callback) {
   /***************************************************************/
 
   for (let i = 0; i < TOTAL_COUNT; i++) {
+    accountsMap[accounts[i]] = i;
     await instance.buyTokens(1000000, {from: accounts[i]})
+  }
+
+  for (let i = EXPERTS_START; i < CREDITORS_START; i++) {
+    expertStats[accounts[i]] = {
+      supported: 0,
+      supportedTokens: 0,
+      success: 0,
+      successTokens: 0
+    };
   }
 
 
   for (let i = DEBTORS_START; i < EXPERTS_START; i++) {
-    debtorsMap[accounts[i]] = i;
-
     debtorsParams[i] = {
       request: Math.random(),
       days: Math.random(),
@@ -177,7 +204,7 @@ module.exports = async function (callback) {
 
   let debtorStat = {};
   //debtors
-  for (let round = 1; round < 10; round++) {
+  for (let round = 1; round < 1000; round++) {
     for (let i = DEBTORS_START; i < EXPERTS_START; i++) {
       if (Math.random() * 30 > debtorsParams[i].request) {
         continue;
@@ -204,19 +231,43 @@ module.exports = async function (callback) {
       await instance.requestLoan(sum, days, {from: accounts[i]});
 
     }
-    readline.clearScreenDown(process.stdout);
-    console.log(/*debtorStat, */`round ${round}, `, 'debtors count: ', Object.keys(debtorStat).length);
-    //await sleep(200)
+    console.log('\x1Bc');
+    console.log(`Issued:\t\tloans:\t${loansCount}\tTokens:\t${loansTokensCount}\tUnique debtors:\t${Object.keys(debtorStat).length}`);
+    console.log(`Returned:\tloans:\t${loansSuccessCount}\tTokens:\t${loansSuccessTokensCount}`);
 
+
+    console.log('');
+    console.log('Experts (success supports/supported) (success supports tokens/supported tokens)');
+
+
+    let expertsLog = '';
+
+
+    for (let i = EXPERTS_START, nl=0; i < CREDITORS_START; i++, nl++) {
+      let expStat = expertStats[ accounts[i] ];
+      let expName = i===EXPERTS_START ? 'scoring' : 'random';
+      expertsLog += `${expName}#${i}:${expStat.success.toString().padStart(3, ' ')}/${expStat.supported.toString().padStart(3, ' ')}) (${expStat.successTokens.toString().padStart(5, ' ')}/${expStat.supportedTokens.toString().padStart(5, ' ')})\t\t`;
+      if (nl%4===0) {
+        expertsLog+='\n'
+      }
+    }
+    console.log(expertsLog);
   }
 
-  await sleep(3000);
-  console.log('experts balances');
-  for (let i = EXPERTS_START; i < CREDITORS_START; i++) {
-    console.log(`${i}\t` + await instance.balanceOf(accounts[i]));
+  console.log('');
+  console.log('Result experts balances (initial balance was 1000000)');
 
+  let expertsBalanceLog = '';
+
+
+  for (let i = EXPERTS_START, nl=0; i < CREDITORS_START; i++, nl++) {
+    let expName = i===EXPERTS_START ? 'scoring' : 'random';
+    expertsBalanceLog += `${expName}#${i}:(${await instance.balanceOf(accounts[i])}\t\t`;
+    if (nl%4===0) {
+      expertsBalanceLog+='\n'
+    }
   }
-
+  console.log(expertsBalanceLog);
 
 
   await fs.writeFile('./artifacts/train.json', JSON.stringify(loans), 'utf8', x=>x);
@@ -231,4 +282,3 @@ function sleep(ms) {
 function log(message) {
   // console.log(message)
 }
-

@@ -61,10 +61,10 @@ contract Loans is Ownable {
     event LoanRequest(uint id, address debtor, uint tokensCount, uint daysCount);
     event LoanSupported(uint id, address debtor, address expert, uint supportedTokens);
     event RequestAccepted(uint id, address debtor, address creditor);
-    event LoanFinished(uint id, address debtor, uint tokensCount, uint daysCount, bool isSuccessful);
+    event LoanFinished(uint id, address debtor, uint tokensCount, uint daysCount, bool isSuccessful, address expert, uint supportedTokens);
 
     /*********************************************/
-    function Loans(bool _isDebug) public {
+    function constructor(bool _isDebug) public {
         isDebug=_isDebug;
     }
 
@@ -80,12 +80,14 @@ contract Loans is Ownable {
     function requestLoan(uint _tokensCount, uint _days) external {
         require(_tokensCount > 0);
 
+        uint tokenCountToReturn =_tokensCount + _tokensCount.mul(_days).mul(percentPerDay)/100;
+
         loans.push(
             Loan(
                 msg.sender,
                 address(0),
                 _tokensCount,
-                _tokensCount + _tokensCount.mul(_days).mul(percentPerDay)/100,
+                tokenCountToReturn,
                 _days,
                 0,
                 false,
@@ -96,7 +98,7 @@ contract Loans is Ownable {
             )
         );
 
-        emit LoanRequest(loans.length-1, msg.sender, _tokensCount, _days);
+        emit LoanRequest(loans.length-1, msg.sender, tokenCountToReturn, _days);
     }
 
     /// expert
@@ -174,7 +176,7 @@ contract Loans is Ownable {
             );
         }
 
-        emit LoanFinished(_id, loans[_id].debtor, loans[_id].tokensCountToReturn, loans[_id].daysCount, true);
+        emit LoanFinished(_id, loans[_id].debtor, loans[_id].tokensCountToReturn, loans[_id].daysCount, true, loans[_id].expert, loans[_id].supportedTokens);
     }
 
     /// debtor
@@ -206,7 +208,7 @@ contract Loans is Ownable {
 
 
 
-        emit LoanFinished(_id, loans[_id].debtor, loans[_id].tokensCountToReturn, loans[_id].daysCount, false);
+        emit LoanFinished(_id, loans[_id].debtor, loans[_id].tokensCountToReturn, loans[_id].daysCount, false, loans[_id].expert, loans[_id].supportedTokens);
     }
 
     /// creditor
@@ -237,7 +239,7 @@ contract Loans is Ownable {
             );
         }
 
-        emit LoanFinished(_id, loans[_id].debtor, loans[_id].tokensCountToReturn, loans[_id].daysCount, false);
+        emit LoanFinished(_id, loans[_id].debtor, loans[_id].tokensCountToReturn, loans[_id].daysCount, false, loans[_id].expert, loans[_id].supportedTokens);
     }
 
 
