@@ -58,7 +58,9 @@ contract Loans is Ownable {
 
     /*********************************************/
 
-    event LoanRequest(uint id);
+    event LoanRequest(uint id, address debtor, uint tokensCount, uint daysCount);
+    event LoanSupported(uint id, address debtor, address expert, uint supportedTokens);
+    event RequestAccepted(uint id, address debtor, address creditor);
     event LoanFinished(uint id, address debtor, uint tokensCount, uint daysCount, bool isSuccessful);
 
     /*********************************************/
@@ -94,7 +96,7 @@ contract Loans is Ownable {
             )
         );
 
-        emit LoanRequest(loans.length-1);
+        emit LoanRequest(loans.length-1, msg.sender, _tokensCount, _days);
     }
 
     /// expert
@@ -113,6 +115,8 @@ contract Loans is Ownable {
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(_tokensCount);
         experts[msg.sender].supports +=1;
         experts[msg.sender].supportsTokens = experts[msg.sender].supportsTokens.add(_tokensCount);
+
+        emit LoanSupported(_id, loans[_id].debtor, loans[_id].expert, loans[_id].supportedTokens);
     }
 
     /// creditor
@@ -125,6 +129,8 @@ contract Loans is Ownable {
         loans[_id].startTs = getCurrentTime();
         loans[_id].creditor = msg.sender;
         transferTokens(loans[_id].debtor, loans[_id].tokensCount);
+
+        emit RequestAccepted(_id, loans[_id].debtor, loans[_id].creditor);
     }
 
     /// debtor
@@ -140,29 +146,67 @@ contract Loans is Ownable {
         loans[_id].isFinished = true;
         loans[_id].isReturned = true;
 
-        transferTokens(loans[_id].creditor, loans[_id].tokensCount);
+        if (loans[_id].expert == address(0)) {
+            transferTokens(loans[_id].creditor, loans[_id].tokensCountToReturn);
+        } else {
+            transferTokens(loans[_id].creditor, loans[_id].tokensCount);
 
 
-        uint percents = loans[_id].tokensCountToReturn.sub(loans[_id].tokensCount);
+            uint percents = loans[_id].tokensCountToReturn.sub(loans[_id].tokensCount);
 
-        uint creditorPercents = percents
+            uint creditorPercents = percents
             .mul(loans[_id].tokensCountToReturn)
             .div(
                 loans[_id].supportedTokens.add(loans[_id].tokensCountToReturn)
             );
 
-        transferTokens(loans[_id].creditor, creditorPercents);
-        transferTokens(loans[_id].expert, percents.sub(creditorPercents));
+            transferTokens(loans[_id].creditor, creditorPercents);
+            transferTokens(loans[_id].expert, percents.sub(creditorPercents));
 
 
-        balanceOf[ loans[_id].expert ] = balanceOf[ loans[_id].expert ].add(
-            loans[_id].supportedTokens
-        );
+            balanceOf[loans[_id].expert] = balanceOf[loans[_id].expert].add(
+                loans[_id].supportedTokens
+            );
 
-        experts[ loans[_id].expert ].successfulSupports += 1;
-        experts[ loans[_id].expert ].successfulSupportsTokens = experts[ loans[_id].expert ].successfulSupportsTokens.add(
-            loans[_id].supportedTokens
-        );
+            experts[loans[_id].expert].successfulSupports += 1;
+            experts[loans[_id].expert].successfulSupportsTokens = experts[loans[_id].expert].successfulSupportsTokens.add(
+                loans[_id].supportedTokens
+            );
+        }
+
+        emit LoanFinished(_id, loans[_id].debtor, loans[_id].tokensCountToReturn, loans[_id].daysCount, true);
+    }
+
+    /// debtor
+    /// for simplified emulation
+    function reportOverdueLoanByDebtor(uint _id) external {
+        requireLoanExists(_id);
+        requireLoanStarted(_id);
+        requireLoanNotFinished(_id);
+
+        loans[_id].isFinished = true;
+
+        if (loans[_id].expert != address(0)) {
+            uint creditorTokens = loans[_id].supportedTokens
+            .mul(loans[_id].tokensCountToReturn)
+            .div(
+                loans[_id].supportedTokens.add(loans[_id].tokensCountToReturn)
+            );
+
+            balanceOf[loans[_id].creditor] = balanceOf[loans[_id].creditor].add(creditorTokens);
+            balanceOf[loans[_id].expert] = balanceOf[loans[_id].expert].add(
+                loans[_id].supportedTokens.sub(creditorTokens)
+            );
+
+            experts[loans[_id].expert].wrongSupports += 1;
+            experts[loans[_id].expert].wrongSupportsTokens = experts[loans[_id].expert].wrongSupportsTokens.add(
+                loans[_id].supportedTokens
+            );
+        }
+
+
+
+        emit LoanFinished(_id, loans[_id].debtor, loans[_id].tokensCountToReturn, loans[_id].daysCount, false);
     }
 
     /// creditor
@@ -175,22 +219,25 @@ contract Loans is Ownable {
 
         loans[_id].isFinished = true;
 
-        uint creditorTokens = loans[_id].supportedTokens
+        if (loans[_id].expert != address(0)) {
+            uint creditorTokens = loans[_id].supportedTokens
             .mul(loans[_id].tokensCountToReturn)
             .div(
                 loans[_id].supportedTokens.add(loans[_id].tokensCountToReturn)
             );
 
-        balanceOf[ loans[_id].creditor ] = balanceOf[ loans[_id].creditor ].add(creditorTokens);
-        balanceOf[ loans[_id].expert ] = balanceOf[ loans[_id].expert ].add(
-            loans[_id].supportedTokens.sub(creditorTokens)
-        );
+            balanceOf[loans[_id].creditor] = balanceOf[loans[_id].creditor].add(creditorTokens);
+            balanceOf[loans[_id].expert] = balanceOf[loans[_id].expert].add(
+                loans[_id].supportedTokens.sub(creditorTokens)
+            );
 
-        experts[ loans[_id].expert ].wrongSupports += 1;
-        experts[ loans[_id].expert ].wrongSupportsTokens = experts[ loans[_id].expert ].wrongSupportsTokens.add(
-            loans[_id].supportedTokens
-        );
+            experts[loans[_id].expert].wrongSupports += 1;
+            experts[loans[_id].expert].wrongSupportsTokens = experts[loans[_id].expert].wrongSupportsTokens.add(
+                loans[_id].supportedTokens
+            );
+        }
 
+        emit LoanFinished(_id, loans[_id].debtor, loans[_id].tokensCountToReturn, loans[_id].daysCount, false);
     }
 
 
@@ -206,7 +253,7 @@ contract Loans is Ownable {
         if (isDebug) {
             return debugTime;
         } else {
-            return getCurrentTime();
+            return now;
         }
     }
 
