@@ -116,7 +116,7 @@ random#247:999374               random#248:998772               random#249:99677
 
 ##### Запуск скрипта для моделирования
 
-
+```
 git clone https://github.com/quantum13/hackathon_karma.git
 cd hackathon_karma/contracts/
 npm install
@@ -128,5 +128,5 @@ sudo pip3 install -r ../models/requirements.txt
 
 Запустить в первой вкладке
 ./node_modules/.bin/truffle compile && ./node_modules/.bin/truffle exec emulators/debtors.js
-
+```
 
